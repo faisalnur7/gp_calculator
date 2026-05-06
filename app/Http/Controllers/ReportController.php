@@ -6,6 +6,7 @@ use App\Helpers\GoldCalculator;
 use App\Models\JewelleryCategory;
 use App\Models\JewelleryItem;
 use App\Models\Shop;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,9 +14,59 @@ class ReportController extends Controller
 {
     public function items(Request $request)
     {
-        $categories = JewelleryCategory::orderBy('name')->get();
-        $shops      = Shop::orderBy('name')->get();
+        $data = $this->getItemsData($request);
+        $data['categories'] = JewelleryCategory::orderBy('name')->get();
+        $data['shops']      = Shop::orderBy('name')->get();
+        return view('reports.items', $data);
+    }
 
+    public function itemsPdf(Request $request)
+    {
+        $data = $this->getItemsData($request);
+        $data['dateLabel'] = $this->dateLabel($request);
+        return Pdf::loadView('reports.pdf.items', $data)
+            ->setPaper('a4', 'landscape')
+            ->download('items-report' . ($data['dateLabel'] ? '-' . str_replace(' ', '_', $data['dateLabel']) : '') . '.pdf');
+    }
+
+    public function shops(Request $request)
+    {
+        $data = $this->getShopsData($request);
+        $data['shopList']   = Shop::orderBy('name')->get();
+        $data['categories'] = JewelleryCategory::orderBy('name')->get();
+        return view('reports.shops', $data);
+    }
+
+    public function shopsPdf(Request $request)
+    {
+        $data = $this->getShopsData($request);
+        $data['dateLabel'] = $this->dateLabel($request);
+        return Pdf::loadView('reports.pdf.shops', $data)
+            ->setPaper('a4', 'landscape')
+            ->download('shops-report' . ($data['dateLabel'] ? '-' . str_replace(' ', '_', $data['dateLabel']) : '') . '.pdf');
+    }
+
+    public function inventory(Request $request)
+    {
+        $data = $this->getInventoryData($request);
+        $data['categories'] = JewelleryCategory::orderBy('name')->get();
+        $data['shops']      = Shop::orderBy('name')->get();
+        return view('reports.inventory', $data);
+    }
+
+    public function inventoryPdf(Request $request)
+    {
+        $data = $this->getInventoryData($request);
+        $data['dateLabel'] = $this->dateLabel($request);
+        return Pdf::loadView('reports.pdf.inventory', $data)
+            ->setPaper('a4', 'landscape')
+            ->download('inventory-report' . ($data['dateLabel'] ? '-' . str_replace(' ', '_', $data['dateLabel']) : '') . '.pdf');
+    }
+
+    // ── Shared data builders ──────────────────────────────────────────────────
+
+    private function getItemsData(Request $request): array
+    {
         $q = JewelleryItem::query()
             ->leftJoin('jewellery_categories', 'jewellery_categories.id', '=', 'jewellery_items.category_id')
             ->leftJoin('shops', 'shops.id', '=', 'jewellery_items.shop_id');
@@ -59,14 +110,11 @@ class ReportController extends Controller
             'value'  => $byCategory->sum('total_value'),
         ];
 
-        return view('reports.items', compact('byCategory', 'grand', 'categories', 'shops'));
+        return compact('byCategory', 'grand');
     }
 
-    public function shops(Request $request)
+    private function getShopsData(Request $request): array
     {
-        $shopList   = Shop::orderBy('name')->get();
-        $categories = JewelleryCategory::orderBy('name')->get();
-
         $rows = Shop::query()
             ->when($request->shop_id, fn($q) => $q->where('id', $request->shop_id))
             ->withCount(['jewelleryItems' => fn($q) => $this->applyFilters($q, $request)])
@@ -108,14 +156,11 @@ class ReportController extends Controller
             'value' => $rows->sum('jewellery_items_sum_subtotal'),
         ];
 
-        return view('reports.shops', compact('rows', 'shopList', 'categories', 'grand'));
+        return compact('rows', 'grand');
     }
 
-    public function inventory(Request $request)
+    private function getInventoryData(Request $request): array
     {
-        $categories = JewelleryCategory::orderBy('name')->get();
-        $shops      = Shop::orderBy('name')->get();
-
         $sortDir  = in_array($request->sort_weight, ['asc', 'desc']) ? $request->sort_weight : null;
         $sortDate = in_array($request->sort_date,   ['asc', 'desc']) ? $request->sort_date   : null;
 
@@ -125,7 +170,7 @@ class ReportController extends Controller
             ->when($request->gold_type,   fn($q) => $q->where('gold_type', $request->gold_type))
             ->when($request->date_from,   fn($q) => $q->whereDate('purchase_date', '>=', $request->date_from))
             ->when($request->date_to,     fn($q) => $q->whereDate('purchase_date', '<=', $request->date_to))
-            ->when($sortDir,  fn($q) => $q->orderBy('total_points', $sortDir))
+            ->when($sortDir,               fn($q) => $q->orderBy('total_points', $sortDir))
             ->when(!$sortDir && $sortDate, fn($q) => $q->orderBy('purchase_date', $sortDate))
             ->when(!$sortDir && !$sortDate, fn($q) => $q->latest())
             ->get();
@@ -142,7 +187,7 @@ class ReportController extends Controller
             'value' => $items->sum('subtotal'),
         ];
 
-        return view('reports.inventory', compact('items', 'categories', 'shops', 'grand'));
+        return compact('items', 'grand');
     }
 
     private function applyFilters($q, Request $request): void
@@ -151,5 +196,15 @@ class ReportController extends Controller
         if ($request->filled('gold_type'))   $q->where('gold_type', $request->gold_type);
         if ($request->filled('date_from'))   $q->whereDate('purchase_date', '>=', $request->date_from);
         if ($request->filled('date_to'))     $q->whereDate('purchase_date', '<=', $request->date_to);
+    }
+
+    private function dateLabel(Request $request): string
+    {
+        $from = $request->filled('date_from') ? $request->date_from : null;
+        $to   = $request->filled('date_to')   ? $request->date_to   : null;
+        if ($from && $to) return $from . ' to ' . $to;
+        if ($from)        return 'from ' . $from;
+        if ($to)          return 'to ' . $to;
+        return '';
     }
 }

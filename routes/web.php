@@ -18,7 +18,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('jewellery-categories', JewelleryCategoryController::class);
     Route::resource('jewellery-items', JewelleryItemController::class);
 
-    Route::get('/reports/items',     [ReportController::class, 'items'])->name('reports.items');
-    Route::get('/reports/shops',     [ReportController::class, 'shops'])->name('reports.shops');
-    Route::get('/reports/inventory', [ReportController::class, 'inventory'])->name('reports.inventory');
+    Route::get('/reports/items',          [ReportController::class, 'items'])->name('reports.items');
+    Route::get('/reports/items/pdf',       [ReportController::class, 'itemsPdf'])->name('reports.items.pdf');
+    Route::get('/reports/shops',           [ReportController::class, 'shops'])->name('reports.shops');
+    Route::get('/reports/shops/pdf',       [ReportController::class, 'shopsPdf'])->name('reports.shops.pdf');
+    Route::get('/reports/inventory',       [ReportController::class, 'inventory'])->name('reports.inventory');
+    Route::get('/reports/inventory/pdf',   [ReportController::class, 'inventoryPdf'])->name('reports.inventory.pdf');
 });
