@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Document;
 
 class Shop extends Model
 {
@@ -17,8 +16,8 @@ class Shop extends Model
         'email',
     ];
 
-    public function documents(): HasMany
+    public function jewelleryItems(): HasMany
     {
-        return $this->hasMany(Document::class);
+        return $this->hasMany(JewelleryItem::class);
     }
 }

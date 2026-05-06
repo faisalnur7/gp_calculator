@@ -14,6 +14,6 @@ class JewelleryCategory extends Model
 
     public function jewelleryItems(): HasMany
     {
-        return $this->hasMany(JewelleryItem::class);
+        return $this->hasMany(JewelleryItem::class, 'category_id');
     }
 }
